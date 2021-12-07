@@ -248,8 +248,9 @@ variable "terraform_distribution" {
 variable "tf_backend_secondary_region" {
   type        = string
   description = "AFT creates a backend for state tracking for its own state as well as OSS cases. The backend's primary region is the same as the AFT region, but this defines the secondary region to replicate to."
+  default     = "null"
   validation {
-    condition     = can(regex("(us(-gov)?|ap|ca|cn|eu|sa)-(central|(north|south)?(east|west)?)-\\d", var.tf_backend_secondary_region))
+    condition     = var.tf_backend_secondary_region == "null" ? true : can(regex("(us(-gov)?|ap|ca|cn|eu|sa)-(central|(north|south)?(east|west)?)-\\d", var.tf_backend_secondary_region))
     error_message = "Variable var: tf_backend_secondary_region is not valid."
   }
 }

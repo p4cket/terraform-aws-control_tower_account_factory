@@ -24,7 +24,8 @@ provider "aws" {
 }
 provider "aws" {
   alias  = "tf_backend_secondary_region"
-  region = var.tf_backend_secondary_region
+  region = var.tf_backend_secondary_region == "null" ? var.ct_home_region : var.tf_backend_secondary_region
+
   assume_role {
     role_arn     = "arn:aws:iam::${var.aft_management_account_id}:role/AWSControlTowerExecution"
     session_name = local.aft_session_name
