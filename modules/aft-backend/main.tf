@@ -12,23 +12,26 @@ resource "aws_s3_bucket" "primary-backend-bucket" {
   versioning {
     enabled = true
   }
-  replication_configuration {
-    role = aws_iam_role.replication.arn
+  dynamic replication_configuration {
+    for_each = count.index == var.secondary_region ? var.secondary_region : []
+    content {
+      role = aws_iam_role[0].replication.arn
 
-    rules {
-      id       = "0"
-      priority = "0"
-      status   = "Enabled"
-      source_selection_criteria {
-        sse_kms_encrypted_objects {
-          enabled = true
+      rules {
+        id       = "0"
+        priority = "0"
+        status   = "Enabled"
+        source_selection_criteria {
+          sse_kms_encrypted_objects {
+            enabled = true
+          }
         }
-      }
 
-      destination {
-        bucket             = aws_s3_bucket.secondary-backend-bucket.arn
-        storage_class      = "STANDARD"
-        replica_kms_key_id = aws_kms_key.encrypt-secondary-region.arn
+        destination {
+          bucket             = aws_s3_bucket.secondary-backend-bucket.arn
+          storage_class      = "STANDARD"
+          replica_kms_key_id = aws_kms_key.encrypt-secondary-region.arn
+        }
       }
     }
   }
@@ -55,6 +58,7 @@ resource "aws_s3_bucket_public_access_block" "primary-backend-bucket" {
 }
 
 resource "aws_s3_bucket" "secondary-backend-bucket" {
+  count    = var.secondary_region ? 1 : 0
   provider = aws.secondary_region
 
   bucket = "aft-backend-${data.aws_caller_identity.current.account_id}-secondary-region"
@@ -77,6 +81,7 @@ resource "aws_s3_bucket" "secondary-backend-bucket" {
 }
 
 resource "aws_s3_bucket_public_access_block" "secondary-backend-bucket" {
+  count    = var.secondary_region ? 1 : 0
   provider = aws.secondary_region
 
   bucket = aws_s3_bucket.secondary-backend-bucket.id
@@ -86,6 +91,7 @@ resource "aws_s3_bucket_public_access_block" "secondary-backend-bucket" {
 }
 
 resource "aws_iam_role" "replication" {
+  count    = var.secondary_region ? 1 : 0
   provider = aws.primary_region
   name     = "aft-s3-terraform-backend-replication"
 
@@ -106,6 +112,7 @@ POLICY
 }
 
 resource "aws_iam_policy" "replication" {
+  count    = var.secondary_region ? 1 : 0
   provider = aws.primary_region
   name     = "aft-s3-terraform-backend-replication-policy"
 
@@ -211,9 +218,10 @@ POLICY
 }
 
 resource "aws_iam_role_policy_attachment" "replication" {
+  count      = var.secondary_region ? 1 : 0
   provider   = aws.primary_region
-  role       = aws_iam_role.replication.name
-  policy_arn = aws_iam_policy.replication.arn
+  role       = aws_iam_role[0].replication.name
+  policy_arn = aws_iam_policy[0].replication.arn
 }
 
 
@@ -231,8 +239,11 @@ resource "aws_dynamodb_table" "lock-table" {
     type = "S"
   }
 
-  replica {
-    region_name = var.secondary_region
+  dynamic "replica" {
+    for_each = count.index == var.secondary_region ? var.secondary_region : []
+    content {
+      region_name = var.secondary_region
+    }
   }
 
   tags = {
@@ -262,6 +273,7 @@ resource "aws_kms_alias" "encrypt-alias-primary-region" {
 }
 
 resource "aws_kms_key" "encrypt-secondary-region" {
+  count    = var.secondary_region ? 1 : 0
   provider = aws.secondary_region
 
   description             = "Terraform backend KMS key."
@@ -273,6 +285,7 @@ resource "aws_kms_key" "encrypt-secondary-region" {
 }
 
 resource "aws_kms_alias" "encrypt-alias-secondary-region" {
+  count    = var.secondary_region ? 1 : 0
   provider = aws.secondary_region
 
   name          = "alias/aft-backend-${data.aws_caller_identity.current.account_id}-kms-key"
